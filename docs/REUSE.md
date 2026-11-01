@@ -2,7 +2,7 @@
 
 ## 安卓个人客户端
 
-安卓子项目复用 Android SDK 35 的前台服务、WebView、VideoView、SQLite 与 Keystore，传输使用 gRPC Java 1.76.0（Apache-2.0）和 protobuf-javalite 4.33.0（BSD-3-Clause）。公开协议子集来自 CloudDrive2 官方 1.1.3 定义，不自行实现网盘登录协议。核心和网页由用户取得的官方归档作为本机构建输入，不提交到公开仓库。媒体库、令牌隔离和核心生命周期属于本客户端；桌面 Python 功能未整体迁移。使用和验证边界见 [安卓说明](../android/README.md)，决策见 [ADR-0130](adr/0130-android-personal-client.md)。
+安卓子项目复用 Android SDK 35 的前台服务、WebView、VideoView、SQLite 与 Keystore，传输使用 gRPC Java 1.76.0（Apache-2.0）和 protobuf-javalite 4.33.0（BSD-3-Clause）。公开协议子集来自随 CloudDrive2 1.1.3 取得的官方 1.1.2 定义，不自行实现网盘登录协议。核心和网页由用户取得的官方归档作为本机构建输入，不提交到公开仓库。媒体库、令牌隔离和核心生命周期属于本客户端；桌面 Python 功能未整体迁移。使用和验证边界见 [安卓说明](../android/README.md)，决策见 [ADR-0130](adr/0130-android-personal-client.md)。
 
 ## 跨平台任务资源计量
 

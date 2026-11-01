@@ -26,6 +26,11 @@ public final class CloudClient implements AutoCloseable {
     }
     String login(String username, String password, String otp, boolean sync) {
         if (!stub().getSystemInfo(Empty.getDefaultInstance()).getIsLogin()) {
+            if (!otp.isEmpty()) {
+                var verified = stub().loginWith2FA(LoginWith2FARequest.newBuilder().setUserName(username).setPassword(password).setTotpCode(otp).setSynDataToCloud(sync).build());
+                if (!verified.getSuccess() || verified.getToken().isEmpty()) throw new IllegalStateException(verified.getErrorMessage());
+                return verified.getToken();
+            }
             var result = stub().login(UserLoginRequest.newBuilder().setUserName(username).setPassword(password).setSynDataToCloud(sync).build());
             if (!result.getSuccess()) throw new IllegalStateException(result.getErrorMessage());
         }
