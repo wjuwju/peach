@@ -1,0 +1,33 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+com.google.android:annotations:4.1.1.4=debugRuntimeClasspath
+com.google.code.findbugs:jsr305:3.0.2=debugCompileClasspath,debugRuntimeClasspath
+com.google.code.gson:gson:2.11.0=debugRuntimeClasspath
+com.google.errorprone:error_prone_annotations:2.36.0=debugCompileClasspath,debugRuntimeClasspath
+com.google.guava:failureaccess:1.0.3=debugCompileClasspath,debugRuntimeClasspath
+com.google.guava:guava:33.4.8-android=debugCompileClasspath,debugRuntimeClasspath
+com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava=debugCompileClasspath,debugRuntimeClasspath
+com.google.j2objc:j2objc-annotations:3.0.0=debugCompileClasspath,debugRuntimeClasspath
+com.google.protobuf:protobuf-javalite:4.33.0=debugCompileClasspath,debugRuntimeClasspath
+com.google.protobuf:protoc:4.33.0=protobufToolsLocator_protoc
+com.squareup.okio:okio-jvm:3.4.0=debugRuntimeClasspath
+com.squareup.okio:okio:3.4.0=debugRuntimeClasspath
+io.grpc:grpc-api:1.76.0=debugCompileClasspath,debugRuntimeClasspath
+io.grpc:grpc-context:1.76.0=debugRuntimeClasspath
+io.grpc:grpc-core:1.76.0=debugRuntimeClasspath
+io.grpc:grpc-okhttp:1.76.0=debugCompileClasspath,debugRuntimeClasspath
+io.grpc:grpc-protobuf-lite:1.76.0=debugCompileClasspath,debugRuntimeClasspath
+io.grpc:grpc-stub:1.76.0=debugCompileClasspath,debugRuntimeClasspath
+io.grpc:grpc-util:1.76.0=debugRuntimeClasspath
+io.grpc:protoc-gen-grpc-java:1.76.0=protobufToolsLocator_grpc
+io.perfmark:perfmark-api:0.27.0=debugRuntimeClasspath
+javax.annotation:javax.annotation-api:1.3.2=debugCompileClasspath
+org.codehaus.mojo:animal-sniffer-annotations:1.24=debugCompileClasspath,debugRuntimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib-common:1.8.0=debugRuntimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0=debugRuntimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0=debugRuntimeClasspath
+org.jetbrains.kotlin:kotlin-stdlib:1.8.0=debugRuntimeClasspath
+org.jetbrains:annotations:13.0=debugRuntimeClasspath
+org.jspecify:jspecify:1.0.0=debugCompileClasspath,debugRuntimeClasspath
+empty=androidApis,androidJdkImage,debugAnnotationProcessorClasspath,debugProtobuf,debugReverseMetadataValues,protobuf

@@ -1,0 +1,14 @@
+Peach Mobile 自用实验版
+
+这是 Peach 项目的个人安卓移植，非 Peach 或 CloudDrive2 官方安卓应用。
+Peach：https://github.com/peach-mitao/peach
+源码许可证：AGPL-3.0-or-later，全文见 PEACH-LICENSE.txt 和仓库 LICENSE。
+
+CloudDrive2 官方安卓核心与网页资源由用户取得的原始归档作为本机构建输入。
+其版权和许可归原作者所有，Peach 的源码许可证不覆盖这些二进制及网页资源。
+来源：https://www.clouddrive2.com/download.html
+许可：https://www.clouddrive2.com/eula.html
+
+gRPC Java：Apache-2.0，https://github.com/grpc/grpc-java
+Protocol Buffers：BSD-3-Clause，https://github.com/protocolbuffers/protobuf
+各依赖保留其原始版权和许可证。
