@@ -97,9 +97,10 @@ public final class MainActivity extends Activity {
             try { startActivityForResult(document, 101); }
             catch (ActivityNotFoundException e) { Toast.makeText(this, "没有可用的文件保存位置", Toast.LENGTH_LONG).show(); }
         });
+        String localToken = null;
         try (InputStream input = new FileInputStream(new File(RuntimeBundle.data(this), "secrets/auth-token"))) {
             String value = RuntimeBundle.readText(input).trim();
-            if (value.matches("[A-Za-z0-9_-]{32,128}")) CookieManager.getInstance().setCookie(ORIGIN, "tok=" + value + "; Path=/; HttpOnly; SameSite=Strict");
+            if (value.matches("[A-Za-z0-9_-]{32,128}")) localToken = value;
         } catch (IOException ignored) { /* 原版登录页处理访问密码与缺失口令。 */ }
         LinearLayout shell = new LinearLayout(this); shell.setOrientation(LinearLayout.VERTICAL);
         Button cloud = new Button(this); cloud.setText("CloudDrive2"); cloud.setAllCaps(false);
@@ -107,7 +108,11 @@ public final class MainActivity extends Activity {
         cloud.setOnClickListener(v -> startActivity(new Intent(this, CloudDriveActivity.class)));
         shell.addView(cloud, new LinearLayout.LayoutParams(-1, (int) (40 * getResources().getDisplayMetrics().density)));
         shell.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
-        root.removeAllViews(); root.addView(shell, new FrameLayout.LayoutParams(-1, -1)); web.loadUrl(ORIGIN + "/");
+        root.removeAllViews(); root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
+        if (localToken == null) web.loadUrl(ORIGIN + "/");
+        else CookieManager.getInstance().setCookie(ORIGIN, "tok=" + localToken + "; Path=/; HttpOnly; SameSite=Strict", accepted -> {
+            if (!isDestroyed()) web.loadUrl(ORIGIN + "/");
+        });
     }
     private void openExternal(Uri uri) {
         if ("javascript".equals(uri.getScheme()) || "file".equals(uri.getScheme()) || "content".equals(uri.getScheme()) || "data".equals(uri.getScheme())) return;

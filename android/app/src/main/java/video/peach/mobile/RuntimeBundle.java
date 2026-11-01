@@ -117,6 +117,7 @@ final class RuntimeBundle {
             "-b", shared.getAbsolutePath() + ":/dev/shm", "-w", "/data",
             "/usr/bin/env", "-u", "LD_LIBRARY_PATH", "-u", "LD_PRELOAD", "-u", "HOME", "-u", "PYTHONHOME", "-u", "VIRTUAL_ENV", "PATH=/usr/local/bin:/usr/bin:/bin",
             "PYTHONPATH=/app/src", "PYTHONUTF8=1", "PYTHONUNBUFFERED=1", "PYSTRAY_BACKEND=dummy", "PEACH_ANDROID=1", "PEACH_DATA_ROOT=/data",
+            "TZ=" + TimeZone.getDefault().getID(),
             "PEACH_HEADLESS_MANAGED=1", "PEACH_FACE_MODELS=/app/tools/face-models", "PEACH_AMANE_RUNTIME=/app/amane-runtime",
             "/usr/local/bin/python3.14", "-m", "peach.server", "--host", "127.0.0.1", "--port", "8900"));
         ProcessBuilder builder = new ProcessBuilder(command).directory(data);
