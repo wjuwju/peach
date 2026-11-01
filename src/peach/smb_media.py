@@ -365,6 +365,9 @@ def resolve(raw, config=None):
     from .platform import resolve_root
     config = config or settings_file.active()
     if os.environ.get('PEACH_ANDROID') == '1':
+        from .android_documents import resolve as resolve_document
+        if document := resolve_document(raw, config):
+            return document
         from .android_cloud import resolve as resolve_cloud
         if cloud := resolve_cloud(raw, config):
             return cloud

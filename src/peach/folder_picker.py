@@ -175,10 +175,13 @@ def command(initial: str | None, platform: str = sys.platform) -> tuple[list[str
 def pick_folder(initial: str | None = None, *, platform: str = sys.platform,
                 run=subprocess.run) -> str | None:
     """弹对话框，返回选中的绝对路径；用户取消返回 None。"""
-    argv, extra = command(initial, platform)
     if not _LOCK.acquire(blocking=False):
         raise PickerBusy("已经有一个选择文件夹的窗口开着")
     try:
+        if os.environ.get('PEACH_ANDROID') == '1':
+            from .android_documents import pick_folder as pick_android
+            return pick_android(initial)
+        argv, extra = command(initial, platform)
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if platform == "win32" else 0
         try:
             result = run(argv, capture_output=True, env={**os.environ, **extra},

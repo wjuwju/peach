@@ -36,12 +36,14 @@ public final class CloudDriveActivity extends Activity {
     private List<CloudDriveFile> files = new ArrayList<>();
     private final List<CloudDriveFile> visible = new ArrayList<>();
     private BaseAdapter adapter;
+    private boolean selecting;
     private final Runnable pulse = new Runnable() {
         @Override public void run() { status.setText(CoreService.state); handler.postDelayed(this, 1000); }
     };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        selecting = getIntent().getBooleanExtra("selectDirectory", false);
         client = new CloudClient(); vault = new TokenVault(this);
         try { client.setToken(vault.load()); }
         catch (Exception e) { vault.clear(); Toast.makeText(this, "登录状态无法解密，请重新登录", Toast.LENGTH_LONG).show(); }
@@ -81,8 +83,8 @@ public final class CloudDriveActivity extends Activity {
         }), new LinearLayout.LayoutParams(0, dp(48), 1)); root.addView(service);
         LinearLayout navigation = row();
         navigation.addView(button("根目录", () -> browse("/", false)), new LinearLayout.LayoutParams(0, dp(48), 1));
-        navigation.addView(button("连接 Peach", () -> connectPeach(false)), new LinearLayout.LayoutParams(0, dp(48), 1));
-        navigation.addView(button("返回 Peach", () -> { startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)); finish(); }), new LinearLayout.LayoutParams(0, dp(48), 1)); root.addView(navigation);
+        if (!selecting) navigation.addView(button("连接 Peach", () -> connectPeach(false)), new LinearLayout.LayoutParams(0, dp(48), 1));
+        navigation.addView(button(selecting ? "取消选择" : "返回 Peach", () -> { if (!selecting) startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)); finish(); }), new LinearLayout.LayoutParams(0, dp(48), 1)); root.addView(navigation);
         search = new EditText(this); search.setSingleLine(); search.setTextSize(15); search.setHint("筛选当前列表…"); root.addView(search);
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
@@ -98,7 +100,15 @@ public final class CloudDriveActivity extends Activity {
         location.addView(pathLabel, new LinearLayout.LayoutParams(0, dp(44), 1));
         refresh = button("刷新", () -> { if (browsing) browse(path, true); else showLibrary(); });
         location.addView(refresh, new LinearLayout.LayoutParams(dp(72), dp(44))); root.addView(location);
-        root.addView(button("将当前目录加入原版 Peach 媒体库", () -> connectPeach(true)));
+        root.addView(button(selecting ? "选择当前目录" : "将当前目录加入原版 Peach 媒体库", () -> {
+            if (!selecting) { connectPeach(true); return; }
+            if (busy || !browsing || path.equals("/") || !client.hasToken()) {
+                Toast.makeText(this, "请先登录并进入一个云盘目录", Toast.LENGTH_LONG).show(); return;
+            }
+            try {
+                setResult(RESULT_OK, new Intent().putExtra("remote", path).putExtra("token", vault.load())); finish();
+            } catch (Exception error) { Toast.makeText(this, "登录状态无法读取，请重新登录", Toast.LENGTH_LONG).show(); }
+        }));
         message = text("", 14); message.setPadding(0, dp(8), 0, dp(8)); root.addView(message);
         grid = new GridView(this); grid.setColumnWidth(dp(150)); grid.setNumColumns(GridView.AUTO_FIT);
         grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH); grid.setHorizontalSpacing(dp(10)); grid.setVerticalSpacing(dp(10));

@@ -17,6 +17,7 @@ public final class CoreService extends Service {
     private final ExecutorService worker = Executors.newCachedThreadPool();
     private volatile Process process;
     private volatile Process peach;
+    private DirectoryBridge directories;
     private volatile boolean stopping;
     private boolean starting;
 
@@ -89,6 +90,7 @@ public final class CoreService extends Service {
             if (!ready && !stopping) throw new IOException("本机服务启动超时，可停止后重试");
             if (ready) {
                 if (listening(8900)) throw new IOException("8900 端口已被其他服务占用");
+                directories = new DirectoryBridge(this);
                 File runtime = RuntimeBundle.install(this, value -> state = value);
                 if (stopping) return;
                 state = "正在启动原版 Peach…";
@@ -133,6 +135,7 @@ public final class CoreService extends Service {
         stopping = true;
         ready = false;
         peachReady = false;
+        if (directories != null) directories.close();
         for (Process owned : new Process[]{peach, process}) if (owned != null) {
             owned.destroy();
             worker.execute(() -> {

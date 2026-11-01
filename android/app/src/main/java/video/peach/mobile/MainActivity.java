@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.*;
 import android.content.*;
 import android.net.Uri;
+import android.provider.DocumentsContract;
 import android.os.*;
 import android.view.*;
 import android.webkit.*;
@@ -13,6 +14,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
+import org.json.JSONObject;
 
 /** 原版 Peach 页面由本机原版后端提供，安卓只负责窗口与系统交互。 */
 public final class MainActivity extends Activity {
@@ -27,6 +29,8 @@ public final class MainActivity extends Activity {
     private String downloadUrl, downloadCookie;
     private View fullscreen;
     private WebChromeClient.CustomViewCallback fullscreenCallback;
+    private String mediaPickerId;
+    private AlertDialog mediaPicker;
     private final Runnable readiness = new Runnable() {
         @Override public void run() {
             if (isDestroyed()) return;
@@ -46,7 +50,7 @@ public final class MainActivity extends Activity {
         Button retry = new Button(this); retry.setText("启动 / 重试"); retry.setOnClickListener(v -> startCore()); startup.addView(retry);
         Button cloud = new Button(this); cloud.setText("内置 CloudDrive2"); cloud.setOnClickListener(v -> startActivity(new Intent(this, CloudDriveActivity.class))); startup.addView(cloud);
         Button logs = new Button(this); logs.setText("查看运行诊断"); logs.setOnClickListener(v -> diagnostics()); startup.addView(logs);
-        root.addView(startup); startCore(); handler.post(readiness);
+        root.addView(startup); DirectoryBridge.attach(this); startCore(); handler.post(readiness);
     }
     private void startCore() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
@@ -129,6 +133,28 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int request, int result, Intent intent) {
         super.onActivityResult(request, result, intent);
+        if (request == 102 || request == 103) {
+            String pickerId = mediaPickerId; mediaPickerId = null;
+            if (pickerId == null) return;
+            if (result != RESULT_OK || intent == null) { DirectoryBridge.cancelSelection(pickerId); return; }
+            try {
+                JSONObject selected;
+                if (request == 102) {
+                    if (intent.getData() == null) throw new IOException("没有取得目录授权");
+                    selected = DirectoryBridge.documentSelection(this, intent.getData(), intent.getFlags());
+                } else {
+                    String remote = intent.getStringExtra("remote"), token = intent.getStringExtra("token");
+                    if (remote == null || token == null) throw new IOException("没有取得云盘目录");
+                    String identifier = DirectoryBridge.hex(java.security.MessageDigest.getInstance("SHA-256").digest(("cloud:" + remote).getBytes(StandardCharsets.UTF_8)));
+                    selected = new JSONObject().put("kind", "cloud").put("id", identifier).put("remote", remote).put("token", token);
+                }
+                DirectoryBridge.completeSelection(pickerId, selected);
+            } catch (Exception error) {
+                try { DirectoryBridge.completeSelection(pickerId, new JSONObject().put("error", "io").put("message", error.getMessage())); }
+                catch (Exception ignored) { DirectoryBridge.cancelSelection(pickerId); }
+            }
+            return;
+        }
         if (request == 100 && chooser != null) { chooser.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, intent)); chooser = null; }
         if (request == 101 && result == RESULT_OK && intent != null && intent.getData() != null && downloadUrl != null) {
             Uri target = intent.getData(); String source = downloadUrl, cookies = downloadCookie;
@@ -148,6 +174,32 @@ public final class MainActivity extends Activity {
             });
         }
     }
+    void pickMediaFolder(String initial, String identifier) {
+        mediaPickerId = identifier;
+        mediaPicker = new AlertDialog.Builder(this).setTitle("选择媒体目录")
+            .setItems(new String[]{"手机文件夹", "内置 CloudDrive2 文件夹"}, (dialog, which) -> {
+                try {
+                    if (which == 1) startActivityForResult(new Intent(this, CloudDriveActivity.class).putExtra("selectDirectory", true), 103);
+                    else {
+                        Intent tree = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+                        startActivityForResult(tree, 102);
+                    }
+                } catch (ActivityNotFoundException error) {
+                    mediaPickerId = null;
+                    try { DirectoryBridge.completeSelection(identifier, new JSONObject().put("error", "io").put("message", "系统没有文件管理应用，请选择内置 CloudDrive2 文件夹")); }
+                    catch (Exception ignored) { DirectoryBridge.cancelSelection(identifier); }
+                }
+            }).setNegativeButton("取消", (dialog, which) -> { mediaPickerId = null; DirectoryBridge.cancelSelection(identifier); })
+            .setOnCancelListener(dialog -> { mediaPickerId = null; DirectoryBridge.cancelSelection(identifier); }).create();
+        mediaPicker.show();
+    }
+    void cancelMediaPicker(String identifier) {
+        if (!java.util.Objects.equals(mediaPickerId, identifier)) return;
+        mediaPickerId = null;
+        if (mediaPicker != null) mediaPicker.dismiss();
+        finishActivity(102); finishActivity(103);
+    }
     private void diagnostics() {
         String value;
         try (RandomAccessFile input = new RandomAccessFile(new File(RuntimeBundle.data(this), "android-runtime.log"), "r")) {
@@ -159,6 +211,8 @@ public final class MainActivity extends Activity {
     }
     @Override public void onBackPressed() { if (fullscreen != null) hideFullscreen(); else if (web != null && web.canGoBack()) web.goBack(); else moveTaskToBack(true); }
     @Override protected void onDestroy() {
+        DirectoryBridge.detach(this);
+        if (mediaPickerId != null) { String id = mediaPickerId; cancelMediaPicker(id); DirectoryBridge.cancelSelection(id); }
         handler.removeCallbacksAndMessages(null); transfers.shutdown(); if (chooser != null) chooser.onReceiveValue(null);
         if (web != null) web.destroy(); super.onDestroy();
     }

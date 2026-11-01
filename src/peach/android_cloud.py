@@ -65,9 +65,12 @@ def resolve(raw, config):
     if isinstance(raw, CloudResource):
         return raw
     mapping_path = config.directory('state') / 'android-cloud-roots.json'
-    if not mapping_path.is_file():
-        return None
-    mapping = json.loads(mapping_path.read_text(encoding='utf-8'))
+    mapping = json.loads(mapping_path.read_text(encoding='utf-8')) if mapping_path.is_file() else {}
+    from .android_documents import selection
+    for root_id, declared in config.storage_roots.items():
+        selected = selection(config, declared['mount'])
+        if selected and selected['kind'] == 'cloud':
+            mapping[root_id] = selected['remote']
     text = str(raw)
     for root_id, remote in mapping.items():
         declared = config.storage_roots.get(root_id)

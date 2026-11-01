@@ -6,11 +6,11 @@ android {
     namespace 'video.peach.mobile'
     compileSdk 35
     defaultConfig {
-        applicationId 'video.peach.personal'
+        applicationId 'video.peach.personal.full'
         minSdk 26
         targetSdk 35
-        versionCode 2
-        versionName '0.52.0-android.2'
+        versionCode 3
+        versionName '0.52.0-android.3'
         ndk { abiFilters(project.findProperty('previewAbi') ?: 'arm64-v8a') }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -55,4 +55,5 @@ tasks.register('copyPeachLicense', Copy) {
 }
 android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/licenseAssets'))
 android.sourceSets.main.assets.srcDir(rootProject.file("runtime-assets/${project.findProperty('previewAbi') ?: 'arm64-v8a'}"))
+android.sourceSets.main.assets.exclude '**/.runtime.zip*', '**/.runtime.json*'
 tasks.named('preBuild').configure { dependsOn 'checkPersonalCore', 'copyPeachLicense' }
