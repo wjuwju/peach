@@ -9,13 +9,14 @@ android {
         applicationId 'video.peach.personal'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0-personal'
+        versionCode 2
+        versionName '0.52.0-android.2'
         ndk { abiFilters(project.findProperty('previewAbi') ?: 'arm64-v8a') }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += ['**/libclouddrive.so'] } }
+    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += ['**/*.so'] } }
     buildTypes { release { minifyEnabled false } }
+    androidResources { noCompress += ['zip'] }
 }
 dependencyLocking { lockAllConfigurations() }
 protobuf {
@@ -41,6 +42,10 @@ tasks.register('checkPersonalCore') {
         if (!file("src/main/jniLibs/${abi}/libclouddrive.so").isFile()) {
             throw new GradleException('缺少自用 CloudDrive2 核心，请按 android/README.md 准备官方文件。')
         }
+        for (name in ['libproot.so', 'libprootloader.so', 'libtalloc.so', 'libandroid-shmem.so']) {
+            if (!file("src/main/jniLibs/${abi}/${name}").isFile()) throw new GradleException('缺少完整 Peach 运行环境：' + name)
+        }
+        if (!rootProject.file("runtime-assets/${abi}/peach/runtime.zip").isFile()) throw new GradleException('请先准备原版 Peach 离线运行环境')
     }
 }
 tasks.register('copyPeachLicense', Copy) {
@@ -49,4 +54,5 @@ tasks.register('copyPeachLicense', Copy) {
     rename { 'PEACH-LICENSE.txt' }
 }
 android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/licenseAssets'))
+android.sourceSets.main.assets.srcDir(rootProject.file("runtime-assets/${project.findProperty('previewAbi') ?: 'arm64-v8a'}"))
 tasks.named('preBuild').configure { dependsOn 'checkPersonalCore', 'copyPeachLicense' }

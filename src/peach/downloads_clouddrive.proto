@@ -11,6 +11,7 @@ syntax = "proto3";
 package clouddrive;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 service CloudDriveFileSrv {
   rpc GetSystemInfo(google.protobuf.Empty) returns (CloudDriveSystemInfo) {}
@@ -25,6 +26,14 @@ service CloudDriveFileSrv {
   rpc RemoveOfflineFiles(RemoveOfflineFilesRequest) returns (FileOperationResult) {}
   rpc ListOfflineFilesByPath(FileRequest) returns (OfflineFileListResult) {}
   rpc GetOfflineQuotaInfo(OfflineQuotaRequest) returns (OfflineQuotaInfo) {}
+  rpc GetSubFiles(ListSubFileRequest) returns (stream SubFilesReply) {}
+  rpc GetDownloadUrlPath(GetDownloadUrlPathRequest) returns (DownloadUrlPathInfo) {}
+  rpc RenameFile(RenameFileRequest) returns (FileOperationResult) {}
+  rpc MoveFile(MoveFileRequest) returns (FileOperationResult) {}
+  rpc DeleteFile(FileRequest) returns (FileOperationResult) {}
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResult) {}
+  rpc WriteToFile(WriteFileRequest) returns (WriteFileResult) {}
+  rpc CloseFile(CloseFileRequest) returns (FileOperationResult) {}
 }
 
 message CloudDriveSystemInfo {
@@ -104,12 +113,35 @@ message CloudDriveFile {
   string name = 2;
   string fullPathName = 3;
   int64 size = 4;
+  google.protobuf.Timestamp writeTime = 7;
   CloudAPI CloudAPI = 9;
   bool isDirectory = 30;
   bool isCloudRoot = 32;
   bool canOfflineDownload = 66;
   bool supportOfflineDownloadManagement = 75;
 }
+
+message ListSubFileRequest { string path = 1; bool forceRefresh = 2; optional bool checkExpires = 3; }
+message SubFilesReply { repeated CloudDriveFile subFiles = 1; }
+message GetDownloadUrlPathRequest { string path = 1; bool preview = 2; bool lazy_read = 3; bool get_direct_url = 4; }
+message DownloadUrlPathInfo {
+  string downloadUrlPath = 1; optional uint64 expiresIn = 2; optional string directUrl = 3;
+  optional string userAgent = 4; map<string, string> additionalHeaders = 5;
+}
+message RenameFileRequest { string theFilePath = 1; string newName = 2; }
+message MoveFileRequest {
+  enum ConflictPolicy { Overwrite = 0; Rename = 1; Skip = 2; }
+  repeated string theFilePaths = 1; string destPath = 2;
+  optional ConflictPolicy conflictPolicy = 3; optional bool moveAcrossClouds = 4;
+}
+message CreateFileRequest { string parentPath = 1; string fileName = 2; }
+message CreateFileResult { uint64 fileHandle = 1; }
+message CloseFileRequest { uint64 fileHandle = 1; optional bool uploadImmediately = 2; }
+message WriteFileRequest {
+  uint64 fileHandle = 1; uint64 startPos = 2; uint64 length = 3;
+  bytes buffer = 4; bool closeFile = 5; optional bool uploadImmediately = 6;
+}
+message WriteFileResult { uint64 bytesWritten = 1; }
 
 message CreateFolderRequest {
   string parentPath = 1;

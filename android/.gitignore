@@ -5,3 +5,4 @@ app/src/main/jniLibs/
 app/src/main/assets/clouddrive/
 *.jks
 *.keystore
+runtime-assets/

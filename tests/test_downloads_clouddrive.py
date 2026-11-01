@@ -137,7 +137,7 @@ class _Server(unittest.TestCase):
             name: grpc.unary_unary_rpc_method_handler(
                 getattr(fake, name), request_deserializer=request.FromString,
                 response_serializer=response.SerializeToString)
-            for name, (request, response) in cd._METHODS.items()}
+            for name, (request, response) in cd._METHODS.items() if hasattr(fake, name)}
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
         server.add_generic_rpc_handlers(
             (grpc.method_handlers_generic_handler("clouddrive.CloudDriveFileSrv", handlers),))

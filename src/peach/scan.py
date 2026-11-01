@@ -254,6 +254,9 @@ def walk_root_for(
     _location, index, tail = resolve_root(root, declared_roots)
     location_mounts = tuple(mounts.get(location, ()))
     from .smb_media import is_address, resolve
+    if os.environ.get('PEACH_ANDROID') == '1':
+        if resource := resolve(root):
+            return resource
     if index < len(location_mounts) and is_address(str(location_mounts[index])):
         resource = resolve(root)
         if resource is None:

@@ -71,6 +71,13 @@ _METHODS = {
     "RemoveOfflineFiles": (pb.RemoveOfflineFilesRequest, pb.FileOperationResult),
     "ListOfflineFilesByPath": (pb.FileRequest, pb.OfflineFileListResult),
     "GetOfflineQuotaInfo": (pb.OfflineQuotaRequest, pb.OfflineQuotaInfo),
+    "GetDownloadUrlPath": (pb.GetDownloadUrlPathRequest, pb.DownloadUrlPathInfo),
+    "RenameFile": (pb.RenameFileRequest, pb.FileOperationResult),
+    "MoveFile": (pb.MoveFileRequest, pb.FileOperationResult),
+    "DeleteFile": (pb.FileRequest, pb.FileOperationResult),
+    "CreateFile": (pb.CreateFileRequest, pb.CreateFileResult),
+    "WriteToFile": (pb.WriteFileRequest, pb.WriteFileResult),
+    "CloseFile": (pb.CloseFileRequest, pb.FileOperationResult),
 }
 
 _NETWORK_CODES = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED,

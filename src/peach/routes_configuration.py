@@ -1166,3 +1166,18 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
     url = f"http://127.0.0.1:{prepared.server.port}/" if distribution.standalone() else str(request.base_url)
     return {"saved": True, "url": url,
             "revision": revision(prepared)}
+
+
+@router.post('/api/configuration/android-cloud')
+def connect_android_cloud(request: Request, body: dict = Body(...), _args=Depends(require_auth)):
+    if os.environ.get('PEACH_ANDROID') != '1':
+        raise HTTPException(404, '此部署没有安卓内置核心')
+    local_only(request)
+    same_origin(request)
+    from .android_integration import connect
+    from .downloads import DownloadError
+    with _SAVE_LOCK:
+        try:
+            return connect(settings_file.load_config(), body)
+        except (ValueError, OSError, DownloadError) as error:
+            raise HTTPException(400, str(error)) from None

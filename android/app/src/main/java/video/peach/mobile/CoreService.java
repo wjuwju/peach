@@ -13,8 +13,10 @@ import java.util.concurrent.*;
 public final class CoreService extends Service {
     public static volatile String state = "尚未启动";
     public static volatile boolean ready;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    public static volatile boolean peachReady;
+    private final ExecutorService worker = Executors.newCachedThreadPool();
     private volatile Process process;
+    private volatile Process peach;
     private volatile boolean stopping;
     private boolean starting;
 
@@ -24,19 +26,23 @@ public final class CoreService extends Service {
         manager.createNotificationChannel(new NotificationChannel("core", "本机云盘服务", NotificationManager.IMPORTANCE_LOW));
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent stop = PendingIntent.getService(this, 1, new Intent(this, CoreService.class).setAction("stop"), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent cloud = PendingIntent.getActivity(this, 2, new Intent(this, CloudDriveActivity.class), PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, "core")
             .setSmallIcon(R.drawable.ic_peach).setContentTitle("Peach 本机云盘服务")
             .setContentText("浏览和播放期间保持运行，可随时停止")
-            .setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null, "停止服务", stop).build()).build();
+            .setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null, "CloudDrive2", cloud).build())
+            .addAction(new Notification.Action.Builder(null, "停止服务", stop).build()).build();
         if (Build.VERSION.SDK_INT >= 34) startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         else startForeground(1, notification);
         if (!starting) { starting = true; worker.execute(this::launch); }
         return START_NOT_STICKY;
     }
 
-    private boolean listening() {
+    private boolean listening() { return listening(19798); }
+
+    private boolean listening(int port) {
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress("127.0.0.1", 19798), 250);
+            socket.connect(new InetSocketAddress("127.0.0.1", port), 250);
             return true;
         } catch (IOException e) { return false; }
     }
@@ -82,6 +88,25 @@ public final class CoreService extends Service {
             }
             if (!ready && !stopping) throw new IOException("本机服务启动超时，可停止后重试");
             if (ready) {
+                if (listening(8900)) throw new IOException("8900 端口已被其他服务占用");
+                File runtime = RuntimeBundle.install(this, value -> state = value);
+                if (stopping) return;
+                state = "正在启动原版 Peach…";
+                peach = RuntimeBundle.launch(this, runtime);
+                if (stopping) { peach.destroy(); return; }
+                long peachDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(5);
+                while (!stopping && System.nanoTime() < peachDeadline) {
+                    if (!peach.isAlive()) throw new IOException("Peach 运行环境启动失败，退出码 " + peach.exitValue());
+                    if (healthy()) { peachReady = true; state = "Peach 与本机云盘运行中"; break; }
+                    Thread.sleep(500);
+                }
+                if (!peachReady && !stopping) throw new IOException("Peach 启动超时，请查看运行诊断");
+                worker.execute(() -> {
+                    try {
+                        int code = peach.waitFor();
+                        if (!stopping) { peachReady = false; state = "Peach 已退出（" + code + "）"; stopSelf(); }
+                    } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                });
                 int code = process.waitFor();
                 if (!stopping) { ready = false; state = "本机服务已退出（" + code + "），请重新启动"; stopSelf(); }
             }
@@ -94,11 +119,21 @@ public final class CoreService extends Service {
         }
     }
 
+    private boolean healthy() {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL("http://127.0.0.1:8900/healthz?ready=1").openConnection();
+            connection.setConnectTimeout(500); connection.setReadTimeout(1000);
+            return connection.getResponseCode() == 200;
+        } catch (IOException e) { return false; }
+        finally { if (connection != null) connection.disconnect(); }
+    }
+
     @Override public void onDestroy() {
         stopping = true;
         ready = false;
-        Process owned = process;
-        if (owned != null) {
+        peachReady = false;
+        for (Process owned : new Process[]{peach, process}) if (owned != null) {
             owned.destroy();
             worker.execute(() -> {
                 try { if (!owned.waitFor(3, TimeUnit.SECONDS)) owned.destroyForcibly(); }
@@ -106,7 +141,7 @@ public final class CoreService extends Service {
             });
         }
         worker.shutdown();
-        if (state.equals("本机服务运行中") || state.startsWith("正在准备")) state = "本机服务已停止";
+        if (state.equals("本机服务运行中") || state.equals("Peach 与本机云盘运行中") || state.startsWith("正在")) state = "本机服务已停止";
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
