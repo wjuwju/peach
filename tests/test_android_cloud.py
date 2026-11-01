@@ -5,6 +5,8 @@ import io
 import json
 import os
 import sqlite3
+import shutil
+import subprocess
 import tempfile
 import unittest
 from contextlib import closing
@@ -22,6 +24,12 @@ from peach.follow_secrets import CredentialStore
 from peach.migrations import upgrade
 from peach.push_discovery import PushDiscoverySettings
 from peach.smb_transport import SmbEntry, SmbStat
+from peach.ffmpeg import FFmpegResolver
+from peach.transcodes import TranscodeService
+from peach.smb_response import SmbResponse
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from support.conditions import missing_prerequisite
 
 
 class AndroidCloudTests(unittest.TestCase):
@@ -94,6 +102,58 @@ class AndroidCloudTests(unittest.TestCase):
             self.assertEqual(reader.read(), b'')
             with self.assertRaises(ValueError):
                 reader.seek(-1)
+
+    def test_cloud_video_is_probed_and_served_through_the_original_media_pipeline(self):
+        ffmpeg = shutil.which('ffmpeg')
+        if not ffmpeg or not shutil.which('ffprobe'):
+            missing_prerequisite('需要 FFmpeg 验证云盘媒体读取与播放响应')
+        source = self.root / 'sample.mp4'
+        generated = subprocess.run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i',
+            'testsrc2=size=96x64:rate=10', '-t', '3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+            str(source)], capture_output=True, timeout=20)
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        data = source.read_bytes()
+        requests = []
+        def respond(request):
+            requests.append(request.headers['range'])
+            start, end, status = smb_media.byte_range(request.headers['range'], len(data))
+            return httpx.Response(status, headers={'Content-Range': f'bytes {start}-{end}/{len(data)}'},
+                                  content=data[start:end + 1])
+        def transport():
+            value = object.__new__(cloud.CloudTransport)
+            value.connection = cloud.CloudConnection('/盘/电影', 'fixture-token')
+            value.client = Mock()
+            value.client.call.return_value = pb.DownloadUrlPathInfo(downloadUrlPath='/static/{SCHEME}/{HOST}/{PREVIEW}/sample.mp4')
+            value.client.find.return_value = pb.CloudDriveFile(name='sample.mp4', fullPathName='/盘/电影/sample.mp4', size=len(data))
+            value.http = httpx.Client(transport=httpx.MockTransport(respond), trust_env=False)
+            return value
+        service = TranscodeService(FFmpegResolver(self.root / 'tools'), self.root / 'transcodes', prefer_hardware=False)
+        app = FastAPI()
+        resource = self.resource('\\sample.mp4')
+        @app.api_route('/video', methods=['GET', 'HEAD'])
+        def video():
+            from peach.media import FilesystemBackend
+            from peach.repository import MediaAsset
+            from peach.platform import translate_roots
+            roots = translate_roots(self.config.locations['local'])
+            filesystem = FilesystemBackend(roots, self.root / 'snapshots')
+            resolved = filesystem.file_for(MediaAsset(1, str(resource), None))
+            self.assertEqual(resolved, resource)
+            path, converted = service.browser_path(1, resolved, convert=False)
+            self.assertFalse(converted)
+            return SmbResponse(path)
+        try:
+            with patch.object(cloud.CloudResource, '_transport', side_effect=transport), \
+                    patch('peach.settings_file.active', return_value=self.config), TestClient(app) as client:
+                self.assertFalse(service.requires_conversion(resource))
+                result = client.get('/video', headers={'Range': 'bytes=0-1023'})
+                self.assertEqual(result.status_code, 206)
+                self.assertEqual(result.headers['content-type'], 'video/mp4')
+                self.assertEqual(result.content, data[:1024])
+                self.assertEqual(client.head('/video').headers['content-length'], str(len(data)))
+                self.assertGreaterEqual(len(requests), 2)
+        finally:
+            smb_media.close_bridge()
 
     def test_writer_uses_exact_offsets_and_checks_upload_close(self):
         client = Mock()

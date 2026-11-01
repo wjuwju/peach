@@ -13,6 +13,8 @@ import android.widget.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.*;
 import org.json.JSONObject;
 
@@ -25,6 +27,8 @@ public final class MainActivity extends Activity {
     private FrameLayout root;
     private TextView status;
     private boolean loaded;
+    private boolean checkingPlayback;
+    private long lastPlaybackError;
     private ValueCallback<Uri[]> chooser;
     private String downloadUrl, downloadCookie;
     private View fullscreen;
@@ -64,6 +68,26 @@ public final class MainActivity extends Activity {
         settings.setAllowFileAccess(false); settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(true); settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW); settings.setSupportMultipleWindows(true);
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                if (!checkingPlayback) return;
+                checkingPlayback = false;
+                view.evaluateJavascript("(() => { const v = document.createElement('video'); const ok = c => !!v.canPlayType('video/mp4; codecs=\"' + c + '\"'); return {schema:1, hvc1_main:ok('hvc1.1.6.L153.B0'), hvc1_main10:ok('hvc1.2.4.L153.B0'), hev1_main:ok('hev1.1.6.L153.B0'), hev1_main10:ok('hev1.2.4.L153.B0')}; })()", result -> {
+                    JSONObject support = new JSONObject();
+                    try { support = new JSONObject(result); } catch (Exception ignored) { }
+                    savePlaybackState("android-playback.json", support);
+                    if (!isDestroyed()) view.loadUrl(ORIGIN + "/");
+                });
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                Uri uri = request.getUrl(); int code = response.getStatusCode(); String route = uri.getPath();
+                if (!local(uri) || route == null || !("/stream".equals(route) || "/api/stream-plan".equals(route) || route.startsWith("/stream/hls/")) || code == 410 || code == 416) return;
+                try { savePlaybackState("android-playback-error.json", new JSONObject().put("status", code).put("route", route)); }
+                catch (Exception ignored) { }
+                if (SystemClock.uptimeMillis() - lastPlaybackError > 5000) {
+                    lastPlaybackError = SystemClock.uptimeMillis();
+                    Toast.makeText(MainActivity.this, "播放请求失败（HTTP " + code + "），可长按上方 CloudDrive2 查看运行诊断", Toast.LENGTH_LONG).show();
+                }
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (local(request.getUrl())) return false;
                 if (request.isForMainFrame() && request.hasGesture()) openExternal(request.getUrl());
@@ -113,13 +137,27 @@ public final class MainActivity extends Activity {
         Button cloud = new Button(this); cloud.setText("CloudDrive2"); cloud.setAllCaps(false);
         cloud.setContentDescription("管理内置 CloudDrive2 账号与媒体目录");
         cloud.setOnClickListener(v -> startActivity(new Intent(this, CloudDriveActivity.class)));
+        cloud.setOnLongClickListener(v -> { diagnostics(); return true; });
         shell.addView(cloud, new LinearLayout.LayoutParams(-1, (int) (40 * getResources().getDisplayMetrics().density)));
         shell.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         root.removeAllViews(); root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
-        if (localToken == null) web.loadUrl(ORIGIN + "/");
+        if (localToken == null) checkPlaybackAndLoad();
         else CookieManager.getInstance().setCookie(ORIGIN, "tok=" + localToken + "; Path=/; HttpOnly; SameSite=Strict", accepted -> {
-            if (!isDestroyed()) web.loadUrl(ORIGIN + "/");
+            if (!isDestroyed()) checkPlaybackAndLoad();
         });
+    }
+    private void checkPlaybackAndLoad() {
+        savePlaybackState("android-playback.json", new JSONObject());
+        checkingPlayback = true;
+        web.loadDataWithBaseURL(ORIGIN + "/", "<!doctype html><html><head><meta charset='utf-8'></head><body></body></html>", "text/html", "UTF-8", null);
+    }
+    private void savePlaybackState(String name, JSONObject value) {
+        try {
+            File state = new File(RuntimeBundle.data(this), "state"); state.mkdirs();
+            File temporary = new File(state, name + ".tmp");
+            Files.write(temporary.toPath(), value.toString().getBytes(StandardCharsets.UTF_8));
+            Files.move(temporary.toPath(), new File(state, name).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ignored) { /* 未取得能力时，后端保留兼容转换路径。 */ }
     }
     private void openExternal(Uri uri) {
         if ("javascript".equals(uri.getScheme()) || "file".equals(uri.getScheme()) || "content".equals(uri.getScheme()) || "data".equals(uri.getScheme())) return;
@@ -206,6 +244,11 @@ public final class MainActivity extends Activity {
             input.seek(Math.max(0, input.length() - 18000)); byte[] buffer = new byte[(int) Math.min(18000, input.length())]; input.readFully(buffer);
             value = new String(buffer, StandardCharsets.UTF_8).replaceAll("(?i)Bearer\\s+[A-Za-z0-9._-]+", "Bearer [已隐藏]");
         } catch (IOException e) { value = CoreService.state; }
+        for (String name : new String[]{"android-playback.json", "android-playback-error.json"}) {
+            try (InputStream input = new FileInputStream(new File(RuntimeBundle.data(this), "state/" + name))) {
+                value += "\n\n" + name + "\n" + RuntimeBundle.readText(input);
+            } catch (IOException ignored) { }
+        }
         TextView text = new TextView(this); text.setText(value); text.setTextIsSelectable(true); ScrollView scroll = new ScrollView(this); scroll.addView(text);
         new AlertDialog.Builder(this).setTitle("本机运行诊断").setView(scroll).setPositiveButton("关闭", null).show();
     }

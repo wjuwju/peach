@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import tempfile
 import threading
@@ -60,6 +61,56 @@ def _media_process(commands, profile, fail=None, duration=None):
 
 
 class TranscodeServiceTests(unittest.TestCase):
+    def test_android_hevc_direct_play_requires_the_reported_tag_profile_and_audio_support(self):
+        from peach import settings_file
+        support = {'schema': 1, 'hvc1_main': True, 'hvc1_main10': True, 'hev1_main': True, 'hev1_main10': True}
+        cases = [
+            ('1', support, 'hvc1', 'yuv420p', 'aac', False),
+            ('1', support, 'hev1', 'yuv420p10le', 'aac', False),
+            ('0', support, 'hvc1', 'yuv420p', 'aac', True),
+            ('1', {**support, 'hev1_main10': False}, 'hev1', 'yuv420p10le', 'aac', True),
+            ('1', {**support, 'hvc1_main': 'true'}, 'hvc1', 'yuv420p', 'aac', True),
+            ('1', {'schema': 2, 'hvc1_main': True}, 'hvc1', 'yuv420p', 'aac', True),
+            ('1', support, 'hvc1', 'yuv422p10le', 'aac', True),
+            ('1', support, 'hvc1', 'yuv420p', 'ac3', True),
+            ('1', support, '', 'yuv420p', 'aac', True),
+        ]
+        for android, reported, tag, pixel_format, audio, needs_conversion in cases:
+            with self.subTest(android=android, tag=tag, pixel_format=pixel_format, audio=audio, support=reported), \
+                    tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                config = settings_file.PeachConfig(root, root / 'config.toml')
+                config.directory('state').mkdir(parents=True)
+                (config.directory('state') / 'android-playback.json').write_text(json.dumps(reported))
+                source = root / 'movie.mp4'
+                source.write_bytes(b'source')
+                service = TranscodeService(_Resolver(root / 'ffmpeg.exe', root / 'ffprobe.exe'), root / 'cache', prefer_hardware=False)
+                commands = []
+                streams = [{'codec_type': 'video', 'codec_name': 'hevc', 'codec_tag_string': tag, 'pix_fmt': pixel_format},
+                           {'codec_type': 'audio', 'codec_name': audio}]
+                with patch.dict(os.environ, {'PEACH_ANDROID': android}), \
+                        patch.object(settings_file, 'active', return_value=config), \
+                        patch('peach.transcodes.subprocess.Popen', side_effect=_media_process(commands, streams)):
+                    self.assertEqual(service.requires_conversion(source), needs_conversion)
+                    if not needs_conversion:
+                        self.assertEqual(service.browser_path(1, source, convert=False), (source, False))
+                    self.assertEqual(service.diagnostic_profile(source)['video_tag'], tag)
+                    self.assertTrue(all(Path(command[0]).stem == 'ffprobe' for command in commands))
+
+    def test_missing_or_malformed_android_capabilities_keep_hevc_conversion(self):
+        from peach import settings_file
+        from peach.android_playback import hevc_supported
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            config = settings_file.PeachConfig(root, root / 'config.toml')
+            config.directory('state').mkdir(parents=True)
+            target = config.directory('state') / 'android-playback.json'
+            with patch.dict(os.environ, {'PEACH_ANDROID': '1'}), patch.object(settings_file, 'active', return_value=config):
+                self.assertFalse(hevc_supported('hvc1', 'yuv420p'))
+                for value in ('not json', '[]', 'null', 'x' * 4097):
+                    target.write_text(value)
+                    self.assertFalse(hevc_supported('hvc1', 'yuv420p'))
+
     def test_diagnostic_profile_reads_cached_evidence_without_touching_media(self):
         from peach.transcodes import _MediaProfile
         service = TranscodeService(_Resolver(None), Path('cache'))
