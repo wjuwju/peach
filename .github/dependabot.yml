@@ -3,6 +3,12 @@
 # semver-major 不进组，照常一个包一个 PR，接管前单独看变更说明。
 version: 2
 updates:
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
   - package-ecosystem: docker
     directory: /.github/actions/actionlint
     schedule:

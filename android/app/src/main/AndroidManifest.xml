@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:label="Peach 完整版" android:icon="@drawable/ic_peach"
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true">
+        <activity android:name=".MainActivity" android:exported="true" android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".ConsoleActivity" android:exported="false" />
+        <activity android:name=".CloudDriveActivity" android:exported="false" />
+        <service android:name=".CoreService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="用户在本机启动云盘核心以浏览和播放自己的媒体" />
+        </service>
+    </application>
+</manifest>

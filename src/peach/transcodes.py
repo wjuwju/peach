@@ -33,6 +33,7 @@ class _MediaProfile:
     duration: float = 0.0
     #: 有 B 帧却没有 ctts：容器声明的显示时刻其实是解码顺序，直接播会掉帧。
     decode_order_timestamps: bool = False
+    video_tag: str = ''
 
 
 @dataclass(frozen=True)
@@ -237,8 +238,10 @@ class TranscodeService:
     @staticmethod
     def _browser_compatible(source: Path, profile: _MediaProfile) -> bool:
         if source.suffix.lower() in {".mp4", ".m4v"}:
-            return (profile.video_codec == "h264"
-                    and profile.pixel_format in DIRECT_MP4_PIXEL_FORMATS
+            from .android_playback import hevc_supported
+            native_video = (profile.video_codec == 'h264' and profile.pixel_format in DIRECT_MP4_PIXEL_FORMATS
+                            or profile.video_codec == 'hevc' and hevc_supported(profile.video_tag, profile.pixel_format))
+            return (native_video
                     and profile.audio_codec in {"", "aac", "mp3"}
                     and not profile.decode_order_timestamps)
         if source.suffix.lower() == ".webm":
@@ -255,7 +258,7 @@ class TranscodeService:
             return None
         command = (
             str(choice.path), "-v", "error", "-show_entries",
-            "stream=codec_type,codec_name,pix_fmt,has_b_frames:format=duration",
+            "stream=codec_type,codec_name,codec_tag_string,pix_fmt,has_b_frames:format=duration",
             "-of", "json", input_url(source),
         )
         try:
@@ -293,6 +296,7 @@ class TranscodeService:
             audio_codec=str(audio.get("codec_name") or "").lower(),
             duration=max(0.0, duration),
             decode_order_timestamps=self._decode_order_timestamps(source, video),
+            video_tag=str(video.get('codec_tag_string') or '').lower(),
         )
 
     @staticmethod

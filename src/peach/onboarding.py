@@ -101,6 +101,8 @@ def validate_data_root(raw: str) -> Path:
     if not text:
         raise ValueError("Peach 数据目录不能为空")
     path = Path(text).expanduser()
+    from .android_documents import validate_data_path
+    validate_data_path(path)
     if path.is_file():
         raise ValueError(f"{path} 是一个文件，Peach 数据目录要是目录")
     return path

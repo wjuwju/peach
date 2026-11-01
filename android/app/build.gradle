@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.protobuf'
+}
+android {
+    namespace 'video.peach.mobile'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'video.peach.personal.full'
+        minSdk 26
+        targetSdk 35
+        versionCode 5
+        versionName '0.52.0-android.5'
+        ndk { abiFilters(project.findProperty('previewAbi') ?: 'arm64-v8a') }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    packaging { jniLibs { useLegacyPackaging = true; keepDebugSymbols += ['**/*.so'] } }
+    buildTypes { release { minifyEnabled false } }
+    androidResources { noCompress += ['zip'] }
+}
+dependencyLocking { lockAllConfigurations() }
+protobuf {
+    protoc { artifact = 'com.google.protobuf:protoc:4.33.0' }
+    plugins { grpc { artifact = 'io.grpc:protoc-gen-grpc-java:1.76.0' } }
+    generateProtoTasks {
+        all().configureEach {
+            builtins { java { option 'lite' } }
+            plugins { grpc { option 'lite' } }
+        }
+    }
+}
+dependencies {
+    implementation 'io.grpc:grpc-okhttp:1.76.0'
+    implementation 'io.grpc:grpc-protobuf-lite:1.76.0'
+    implementation 'io.grpc:grpc-stub:1.76.0'
+    implementation 'com.google.protobuf:protobuf-javalite:4.33.0'
+    compileOnly 'javax.annotation:javax.annotation-api:1.3.2'
+}
+tasks.register('checkPersonalCore') {
+    doLast {
+        def abi = project.findProperty('previewAbi') ?: 'arm64-v8a'
+        if (!file("src/main/jniLibs/${abi}/libclouddrive.so").isFile()) {
+            throw new GradleException('缺少自用 CloudDrive2 核心，请按 android/README.md 准备官方文件。')
+        }
+        for (name in ['libproot.so', 'libprootloader.so', 'libtalloc.so', 'libandroid-shmem.so']) {
+            if (!file("src/main/jniLibs/${abi}/${name}").isFile()) throw new GradleException('缺少完整 Peach 运行环境：' + name)
+        }
+        if (!rootProject.file("runtime-assets/${abi}/peach/runtime.zip").isFile()) throw new GradleException('请先准备原版 Peach 离线运行环境')
+    }
+}
+tasks.register('copyPeachLicense', Copy) {
+    from rootProject.file('../LICENSE')
+    into layout.buildDirectory.dir('generated/licenseAssets')
+    rename { 'PEACH-LICENSE.txt' }
+}
+android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/licenseAssets'))
+android.sourceSets.main.assets.srcDir(rootProject.file("runtime-assets/${project.findProperty('previewAbi') ?: 'arm64-v8a'}"))
+android.sourceSets.main.assets.exclude '**/.runtime.zip*', '**/.runtime.json*'
+tasks.named('preBuild').configure { dependsOn 'checkPersonalCore', 'copyPeachLicense' }

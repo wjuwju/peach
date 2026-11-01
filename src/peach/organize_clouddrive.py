@@ -91,7 +91,8 @@ def _messages():
         move.oneof_decl.add(name='_' + name)
         move.field.add(name=name, number=number, type=8, label=1, proto3_optional=True, oneof_index=index)
     pool = descriptor_pool.DescriptorPool()
-    pool.AddSerializedFile(pb.DESCRIPTOR.dependencies[0].serialized_pb)
+    for dependency in pb.DESCRIPTOR.dependencies:
+        pool.AddSerializedFile(dependency.serialized_pb)
     pool.AddSerializedFile(pb.DESCRIPTOR.serialized_pb)
     pool.Add(proto)
     return tuple(message_factory.GetMessageClass(pool.FindMessageTypeByName('peach_organize_cloud.' + name))

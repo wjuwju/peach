@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import codecs
 import hashlib
-import os
 import re
 import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
@@ -259,12 +258,12 @@ def file_key(name: str) -> str:
 
 def discover_sidecars(video: Path, video_suffixes: set[str]) -> list[dict]:
     """读取正片所在目录，返回配给当前视频的字幕，不写账本。"""
+    from .media_io import directory_entries
     try:
-        with os.scandir(video.parent) as entries:
-            names = [entry.name for entry in entries
-                     if (Path(entry.name).suffix.lower() in video_suffixes
-                         or subtitle_format(entry.name))
-                     and entry.is_file(follow_symlinks=False)]
+        names = [entry.name for entry in directory_entries(video.parent)
+                 if (Path(entry.name).suffix.lower() in video_suffixes
+                     or subtitle_format(entry.name))
+                 and not entry.is_dir() and not entry.is_symlink() and not entry.error]
     except OSError:
         return []
     videos = [name for name in names if Path(name).suffix.lower() in video_suffixes]

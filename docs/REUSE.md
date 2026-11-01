@@ -1,5 +1,9 @@
 # 复用清单
 
+## 安卓个人客户端
+
+安卓子项目复用 Android SDK 35 的前台服务、WebView、系统文件选择与 Keystore，传输使用 gRPC Java 1.76.0（Apache-2.0）和 protobuf-javalite 4.33.0（BSD-3-Clause）。公开协议子集来自随 CloudDrive2 1.1.3 取得的官方 1.1.2 定义，不自行实现网盘登录协议。主界面与业务使用原版前端、Python 后端和 ledger；新增云盘资源复用 `SmbResource`、媒体回环读取、原版扫描与 `organize_clouddrive` 的官方目录核验。运行环境复用 Docker 官方 Python 3.14.8、Debian trixie 的 FFmpeg 和 Termux PRoot 5.1.107.101、talloc 2.5.0、libandroid-shmem 0.7；包摘要固定于 `android/runtime-inputs.json`，Python 与 amane 沿用原锁，许可证和源码保留于运行环境。CloudDrive2 核心、官方网页和运行归档作为本机构建输入，不提交到公开仓库。使用和验证边界见 [安卓说明](../android/README.md)，决策见 [ADR-0130](adr/0130-android-personal-client.md)。
+
 ## 跨平台任务资源计量
 
 继续使用 psutil 7.2.2 读取进程 CPU 时间和身份。该版本的 macOS 线程列表使用序号，不能与 Python 原生线程 ID 对应；因此使用系统 `libproc` 的 `PROC_PIDTHREADID64INFO` 取得指定线程的纳秒时间，接口与单位见 [XNU 实现](https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/bsd_kern.c)。Linux 的可用 CPU 容量复用亲和性、控制组成员和挂载信息，按可见 cgroup v1/v2 配额归一化。
@@ -915,6 +919,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | 能力 | 复用实现 | Peach 负责 |
 |---|---|---|
 | 本机文件夹对话框 | Windows 自带 `powershell.exe` 经 `Add-Type` 调 Shell 的 `IFileOpenDialog`（带地址栏），STA 线程里 `SetThreadDpiAwarenessContext` 设 Per-Monitor V2；macOS `osascript` 的 `choose folder` | `src/peach/folder_picker.py` 只拼命令、区分取消与失败、一次只开一个，用完恢复原 DPI 上下文（托盘的进程 DPI 不传给子进程）；不引 tkinter 或 GUI 框架。证书子进程用 `CREATE_NO_WINDOW`，保留 OpenSSL 退出码与错误输出 |
+| 安卓授权媒体目录 | 系统 [Storage Access Framework](https://developer.android.com/training/data-storage/shared/documents-files) 与 [DocumentsContract](https://developer.android.com/reference/android/provider/DocumentsContract)，内置云盘复用现有 CloudDrive2 客户端 | `android_documents` 与 `DirectoryBridge` 保留用户授权、取消和配置身份，通过私有口令的回环连接读取目录与文件；不把 content URI 转成磁盘路径。媒体读写沿用 `SmbResource` 的资源契约和原版扫描、配套文件、媒体输入桥；选择本身不保存未提交的配置，不新增运行依赖 |
 | 跨磁盘迁移数据目录 | Windows Shell 的 `SHFileOperationW`（`FO_COPY`，ctypes 直调）：资源管理器自带的复制进度、剩余时间与取消；其他系统用标准库 `shutil.copytree` | `src/peach/data_storage.py` 负责目标校验、复制前后核对文件数与字节、失败删掉已复制部分、改写账本里的数据目录路径与位置记录；同卷只用 `os.rename` |
 | HTTP | 全项目共用的 `httpx.Client`/transport；FANBOX 公开 `post.info` 用 `curl_cffi`；对外 UA 统一取 `peach.user_agent.USER_AGENT`（与本机 Chrome 同大版本，ADR-0060），HTTPX、来源连接器、FFmpeg 抽帧与脚本共用 | 来源策略、DTO、脱敏、站点限定、大小上限；不求解机器人质询，标准 UA 不保证放行 |
 | 追更来源接口 | FANBOX 公开帖子 API（详情只用用户的可选 Cookie 与 curl_cffi `chrome150`）、kemono 系公开 JSON API（`Accept: text/css`，站点自述的抓取路径）、rule34.xxx 官方 dapi（需 API key）与公开 tag 补全、Paheal 标签/详情页、Gofile contents API（需 Premium token）、f95zone `latest_data.php`、站内搜索（需登录 cookie）、线程页与 masked XHR、simpcity 线程页与站内搜索（需登录 cookie；只请求规范地址，不解 DDoS-Guard 质询） | 连接器边界、凭据隔离、多媒体顺序、文件站目标校验、变体与跨站重复判定、候选复核与批准后的 online asset 投影 |

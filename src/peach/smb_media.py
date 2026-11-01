@@ -6,6 +6,7 @@ import hmac
 import io
 import errno
 import mimetypes
+import os
 import secrets
 import stat
 import threading
@@ -363,6 +364,13 @@ def resolve(raw, config=None):
     from . import media_identity, settings_file
     from .platform import resolve_root
     config = config or settings_file.active()
+    if os.environ.get('PEACH_ANDROID') == '1':
+        from .android_documents import resolve as resolve_document
+        if document := resolve_document(raw, config):
+            return document
+        from .android_cloud import resolve as resolve_cloud
+        if cloud := resolve_cloud(raw, config):
+            return cloud
     if not any(value.get('transport') == 'smb' for value in getattr(config, 'storage_roots', {}).values()):
         return None
     location, index, tail = resolve_root(str(raw), config.locations)

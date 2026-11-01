@@ -1,0 +1,32 @@
+// 随 CloudDrive2 1.1.3 取得的官方 1.1.2 公开协议子集，字段号保持一致。
+// 来源：https://www.clouddrive2.com/api/clouddrive.proto
+syntax = "proto3";
+package clouddrive;
+option java_package = "video.peach.mobile.rpc";
+option java_multiple_files = true;
+import "google/protobuf/empty.proto";
+service CloudDriveFileSrv {
+  rpc GetSystemInfo(google.protobuf.Empty) returns (CloudDriveSystemInfo) {}
+  rpc GetToken(GetTokenRequest) returns (JWTToken) {}
+  rpc Login(UserLoginRequest) returns (FileOperationResult) {}
+  rpc LoginWith2FA(LoginWith2FARequest) returns (JWTToken) {}
+  rpc GetSubFiles(ListSubFileRequest) returns (stream SubFilesReply) {}
+  rpc GetDownloadUrlPath(GetDownloadUrlPathRequest) returns (DownloadUrlPathInfo) {}
+}
+message CloudDriveSystemInfo { bool IsLogin = 1; string UserName = 2; bool SystemReady = 3; }
+message GetTokenRequest { string userName = 1; string password = 2; optional string totpCode = 3; }
+message JWTToken { bool success = 1; string errorMessage = 2; string token = 3; }
+message UserLoginRequest { string userName = 1; string password = 2; bool synDataToCloud = 3; }
+message LoginWith2FARequest { string userName = 1; string password = 2; string totp_code = 3; bool synDataToCloud = 4; }
+message FileOperationResult { bool success = 1; string errorMessage = 2; repeated string resultFilePaths = 3; }
+message ListSubFileRequest { string path = 1; bool forceRefresh = 2; optional bool checkExpires = 3; }
+message SubFilesReply { repeated CloudDriveFile subFiles = 1; }
+message CloudDriveFile {
+  string id = 1; string name = 2; string fullPathName = 3; int64 size = 4;
+  string thumbnailUrl = 10; bool isDirectory = 30;
+}
+message GetDownloadUrlPathRequest { string path = 1; bool preview = 2; bool lazy_read = 3; bool get_direct_url = 4; }
+message DownloadUrlPathInfo {
+  string downloadUrlPath = 1; optional uint64 expiresIn = 2; optional string directUrl = 3;
+  optional string userAgent = 4; map<string, string> additionalHeaders = 5;
+}

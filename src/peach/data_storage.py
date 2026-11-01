@@ -467,6 +467,8 @@ def check_target(config, raw: object, *, program: Path | None = None) -> Path:
     if target.parent == target:
         raise ValueError("请选择或新建一个专用文件夹，不要直接使用磁盘根目录")
     target = target.resolve()
+    from .android_documents import validate_data_path
+    validate_data_path(target)
     source = config.data_root.resolve()
     if target == source or target.is_relative_to(source) or source.is_relative_to(target):
         raise ValueError("新位置不能与当前数据目录相同或互相包含")

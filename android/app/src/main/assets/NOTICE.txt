@@ -1,0 +1,21 @@
+Peach Mobile 自用版
+
+这是 Peach 项目的个人安卓移植，非 Peach 或 CloudDrive2 官方安卓应用。
+Peach：https://github.com/peach-mitao/peach
+源码许可证：AGPL-3.0-or-later，全文见 PEACH-LICENSE.txt 和仓库 LICENSE。
+
+CloudDrive2 官方安卓核心与网页资源由用户取得的原始归档作为本机构建输入。
+其版权和许可归原作者所有，Peach 的源码许可证不覆盖这些二进制及网页资源。
+来源：https://www.clouddrive2.com/download.html
+许可：https://www.clouddrive2.com/eula.html
+
+gRPC Java：Apache-2.0，https://github.com/grpc/grpc-java
+Protocol Buffers：BSD-3-Clause，https://github.com/protocolbuffers/protobuf
+各依赖保留其原始版权和许可证。
+
+完整运行环境使用 Docker 官方 Python、Debian trixie 与 FFmpeg。
+原版 Peach、资源、迁移、主依赖锁和 amane 对应源码位于随包运行环境的 app 目录。
+Debian 软件包版权文本位于 usr/share/doc；Python 依赖保留 dist-info 许可证。
+PRoot 5.1.107.101（GPL-2.0）：https://github.com/termux/proot
+talloc 2.5.0（LGPL-3.0-or-later）：https://talloc.samba.org/
+libandroid-shmem 0.7（BSD-3-Clause）：https://github.com/termux/libandroid-shmem
