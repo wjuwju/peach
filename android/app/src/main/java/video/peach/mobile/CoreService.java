@@ -94,7 +94,7 @@ public final class CoreService extends Service {
                 state = "正在启动原版 Peach…";
                 peach = RuntimeBundle.launch(this, runtime);
                 if (stopping) { peach.destroy(); return; }
-                long peachDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(5);
+                long peachDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(10);
                 while (!stopping && System.nanoTime() < peachDeadline) {
                     if (!peach.isAlive()) throw new IOException("Peach 运行环境启动失败，退出码 " + peach.exitValue());
                     if (healthy()) { peachReady = true; state = "Peach 与本机云盘运行中"; break; }
@@ -123,7 +123,7 @@ public final class CoreService extends Service {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL("http://127.0.0.1:8900/healthz?ready=1").openConnection();
-            connection.setConnectTimeout(500); connection.setReadTimeout(1000);
+            connection.setConnectTimeout(2000); connection.setReadTimeout(15000);
             return connection.getResponseCode() == 200;
         } catch (IOException e) { return false; }
         finally { if (connection != null) connection.disconnect(); }
