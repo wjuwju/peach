@@ -106,7 +106,11 @@ final class RuntimeBundle {
         File nativeDir = new File(context.getApplicationInfo().nativeLibraryDir);
         File dependencies = new File(context.getFilesDir(), "native-dependencies"); dependencies.mkdirs();
         File talloc = new File(dependencies, "libtalloc.so.2");
-        if (!talloc.exists()) Os.symlink(new File(nativeDir, "libtalloc.so").getAbsolutePath(), talloc.getAbsolutePath());
+        Path expected = new File(nativeDir, "libtalloc.so").toPath();
+        if (!Files.isSymbolicLink(talloc.toPath()) || !Files.readSymbolicLink(talloc.toPath()).equals(expected)) {
+            Files.deleteIfExists(talloc.toPath());
+            Os.symlink(expected.toString(), talloc.getAbsolutePath());
+        }
         File data = data(context), media = new File(context.getFilesDir(), "peach-media");
         data.mkdirs(); media.mkdirs();
         File shared = new File(context.getCacheDir(), "peach-shm"); shared.mkdirs();

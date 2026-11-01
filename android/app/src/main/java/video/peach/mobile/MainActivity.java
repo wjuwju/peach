@@ -31,7 +31,10 @@ public final class MainActivity extends Activity {
         @Override public void run() {
             if (isDestroyed()) return;
             if (CoreService.peachReady && !loaded) showPeach();
-            else if (!loaded) { status.setText(CoreService.state); handler.postDelayed(this, 700); }
+            else if (!loaded) {
+                if (!status.getText().toString().equals(CoreService.state)) status.setText(CoreService.state);
+                handler.postDelayed(this, 700);
+            }
         }
     };
     @Override public void onCreate(Bundle saved) {
