@@ -9,8 +9,8 @@ android {
         applicationId 'video.peach.personal.full'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.52.0-android.4'
+        versionCode 5
+        versionName '0.52.0-android.5'
         ndk { abiFilters(project.findProperty('previewAbi') ?: 'arm64-v8a') }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }

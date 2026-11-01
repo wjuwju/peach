@@ -1,10 +1,41 @@
 """安卓进程时间使用系统允许的启动时钟，桌面运行方式保持原样。"""
 import os
+from pathlib import Path
+import runpy
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
 from peach.android_platform import configure
+
+
+@unittest.skipIf(os.name == 'nt', 'Linux 运行环境的构建链接检查')
+class AndroidRuntimeLibrariesTests(unittest.TestCase):
+    def test_unpackaged_debian_alternatives_have_resolvable_runtime_names(self):
+        prepare = runpy.run_path(str(Path(__file__).resolve().parents[1] /
+                                    'android/package_runtime.py'))['prepare_library_links']
+        for abi, multiarch in [('arm64-v8a', 'aarch64-linux-gnu'), ('x86_64', 'x86_64-linux-gnu')]:
+            with self.subTest(abi=abi), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                directory = root / 'usr/lib' / multiarch
+                for name in ('blas', 'lapack'):
+                    target = directory / name / f'lib{name}.so.3'
+                    target.parent.mkdir(parents=True)
+                    target.write_bytes(name.encode())
+                    (directory / target.name).symlink_to('../../../etc/alternatives/' + target.name)
+                prepare(root, abi)
+                prepare(root, abi)
+                for name in ('blas', 'lapack'):
+                    link = directory / f'lib{name}.so.3'
+                    self.assertEqual(link.read_bytes(), name.encode())
+                    self.assertFalse(Path(os.readlink(link)).is_absolute())
+
+    def test_missing_library_prevents_packaging(self):
+        prepare = runpy.run_path(str(Path(__file__).resolve().parents[1] /
+                                    'android/package_runtime.py'))['prepare_library_links']
+        with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(ValueError, 'libblas'):
+            prepare(Path(temporary).resolve(), 'arm64-v8a')
 
 
 class AndroidPlatformTests(unittest.TestCase):

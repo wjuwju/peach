@@ -56,6 +56,55 @@ class AndroidCloudTests(unittest.TestCase):
     def resource(self, suffix=''):
         return smb_media.resolve('R:\\CloudDrive\\fixture' + suffix, self.config)
 
+    def test_cloud_subtitles_are_discovered_and_served_through_the_original_routes(self):
+        from peach.api import create_app
+        from peach.config import PeachSettings
+        from support.web import route_client
+        from support.ledger import fresh_ledger
+        database = fresh_ledger(self.root)
+        video = self.resource('\\fixture.mp4')
+        text = '1\n00:00:01,000 --> 00:00:02,000\n云盘字幕\n'.encode()
+        transport = Mock()
+        transport.scandir.return_value = [
+            SmbEntry(8, 1, 1, False, 'fixture.mp4'),
+            SmbEntry(len(text), 1, 1, False, 'fixture.chs.srt'),
+            SmbEntry(len(text), 1, 1, False, 'fixture.jp.srt'),
+            SmbEntry(0, 1, 1, True, 'fixture.ass'),
+            SmbEntry(4, 1, 1, False, 'fixture.en.srt', True),
+            SmbEntry(8, 1, 1, False, 'other.mp4'),
+            SmbEntry(4, 1, 1, False, 'other.srt')]
+        transport.stat.return_value = SmbStat(len(text), 1, 1, False, 'fixture.chs.srt')
+        transport.open.side_effect = lambda parts: io.BytesIO(text)
+        with closing(sqlite3.connect(database)) as connection, connection:
+            connection.execute("INSERT INTO asset(id,location,path,name,medium,first_seen,last_seen) "
+                               "VALUES(1,'local',?,'fixture.mp4','video','2026-11-01','2026-11-01')",
+                               (str(video),))
+            connection.execute("INSERT INTO asset_subtitle(asset_id,location,path,name,language,format,"
+                               "size,mtime,pairing,first_seen,last_seen) "
+                               "VALUES(1,'local',?,'fixture.chs.srt','zh-Hans','srt',40,'2026-11-01',"
+                               "'suffix','2026-11-01','2026-11-01')", (str(video.parent / 'fixture.chs.srt'),))
+        with patch('peach.settings_file.active', return_value=self.config), \
+                patch.object(cloud.CloudResource, '_transport', return_value=transport):
+            app = create_app(PeachSettings(db_path=database, configured=True, token='',
+                                          allowed_media_roots=(self.resource(),)))
+            with route_client(app) as client:
+                response = client.get('/api/assets/1/subtitles')
+                self.assertEqual(response.status_code, 200)
+                tracks = response.json()['subtitles']
+                self.assertEqual([row['name'] for row in tracks], ['fixture.chs.srt', 'fixture.jp.srt'])
+                self.assertTrue(all(row['playable'] for row in tracks))
+                self.assertIn('云盘字幕', client.get(tracks[1]['src']).text)
+                result = client.get(tracks[0]['src'])
+                self.assertEqual(result.status_code, 200)
+                self.assertIn('云盘字幕', result.text)
+                self.assertIn('00:00:01.000 --> 00:00:02.000', result.text)
+                transport.scandir.side_effect = PermissionError('offline')
+                self.assertEqual(client.get('/api/assets/1/subtitles').status_code, 200)
+                app.state.media_engine.filesystem.allowed_roots = ()
+                self.assertEqual(client.get(tracks[0]['src']).status_code, 404)
+        with closing(sqlite3.connect(database)) as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM asset_subtitle').fetchone()[0], 1)
+
     def test_declared_paths_resolve_with_credentials_and_refuse_escape(self):
         resource = self.resource('\\电影.mp4')
         self.assertEqual(resource.remote_parts, ('盘', '电影', '电影.mp4'))

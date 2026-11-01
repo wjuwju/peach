@@ -56,7 +56,25 @@ def amane(root, packages, work):
     (destination / 'manifest.json').write_text(json.dumps(facts, ensure_ascii=False, indent=2))
 
 
+def prepare_library_links(root, abi):
+    """补齐仅解包 Debian 依赖时未执行 update-alternatives 的数学库入口。"""
+    multiarch = {'arm64-v8a': 'aarch64-linux-gnu', 'x86_64': 'x86_64-linux-gnu'}[abi]
+    directory = root / 'usr/lib' / multiarch
+    for library in ('blas', 'lapack'):
+        name = f'lib{library}.so.3'
+        target = directory / library / name
+        if not target.is_file():
+            raise ValueError(f'运行环境缺少 {multiarch}/{library}/{name}')
+        link = directory / name
+        if link.is_file():
+            continue
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(f'{library}/{name}')
+
+
 def package(root, termux, output, abi):
+    prepare_library_links(root, abi)
     native = PROJECT / 'android/app/src/main/jniLibs' / abi
     native.mkdir(parents=True, exist_ok=True)
     for source, target in [('bin/proot', 'libproot.so'), ('libexec/proot/loader', 'libprootloader.so'),
@@ -73,7 +91,7 @@ def package(root, termux, output, abi):
     output.mkdir(parents=True, exist_ok=True)
     archive_path = output / '.runtime.zip.part'
     modes, links = {}, {}
-    with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=4) as archive:
+    with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in sorted(root.rglob('*')):
             relative = path.relative_to(root).as_posix()
             if '__pycache__' in path.parts or path.suffix == '.pyc':
